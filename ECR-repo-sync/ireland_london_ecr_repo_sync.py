@@ -5,6 +5,7 @@ import boto3
 import base64
 import docker
 import sys
+import subprocess
 
 # Environment variables
 IRELAND_REGION='eu-west-1'      # Source AWS region
@@ -59,10 +60,20 @@ def pull_image(repository, tag, auth_creds):
 
 
 def image_tag(current_tag, new_tag):
-    """Tag Docker image.
+    """Tag Docker image (using Docker API).
+       Note: Docker API doesn't work if using DIND (Docker in Docker). Use 'image_tag_v2' function instead
     """
     print(f"Retagging '{current_tag}' image to '{new_tag}'.")
     if docker_api.tag(current_tag, new_tag) is False:
+        raise RuntimeError(f"Tagging from '{current_tag}' to '{new_tag}' failed.")
+
+
+def image_tag_v2(current_tag, new_tag):
+    """Tag Docker image (using subprocess.call).
+    """
+    print(f"Retagging '{current_tag}' image to '{new_tag}'.")
+    command = (f"docker tag {current_tag} {new_tag}")
+    if subprocess.call(command, shell=True) is False:
         raise RuntimeError(f"Tagging from '{current_tag}' to '{new_tag}' failed.")
 
 
@@ -91,7 +102,7 @@ if __name__ == "__main__":
             # Pull image from Ireland ECR repo
             pull_image(f"{ireland_ecr_registry}/{repo}", tag, ireland_auth_creds)
             # Retag the image
-            image_tag(f"{ireland_ecr_registry}/{repo}:{tag}", f"{london_ecr_registry}/{repo}:{tag}")
+            image_tag_v2(f"{ireland_ecr_registry}/{repo}:{tag}", f"{london_ecr_registry}/{repo}:{tag}")
             # Push image to London ECR repo
             push_image(f"{london_ecr_registry}/{repo}", tag, london_auth_creds)
 
